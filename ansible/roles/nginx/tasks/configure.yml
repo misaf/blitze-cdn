@@ -1,0 +1,86 @@
+- name: Ensure nginx cache directory exists
+  ansible.builtin.file:
+    path: "{{ nginx_cache_path }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
+
+- name: Ensure ACME challenge directory exists
+  ansible.builtin.file:
+    path: "{{ nginx_acme_challenge_root }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
+
+- name: Copy nginx cache configuration
+  ansible.builtin.template:
+    src: etc/nginx/conf.d/cdn-cache.conf.j2
+    dest: /etc/nginx/conf.d/cdn-cache.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Test nginx configuration
+    - Reload nginx
+
+- name: Copy nginx HTTP bootstrap site configurations
+  ansible.builtin.template:
+    src: etc/nginx/sites-available/cdn-site.conf.j2
+    dest: /etc/nginx/sites-available/{{ item.name }}.conf
+    owner: root
+    group: root
+    mode: '0644'
+  loop: "{{ nginx_cdn_sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+  vars:
+    nginx_render_ssl: false
+  notify:
+    - Test nginx configuration
+    - Reload nginx
+
+- name: Disable default nginx site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify:
+    - Test nginx configuration
+    - Reload nginx
+
+- name: Enable nginx sites
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/{{ item.name }}.conf
+    dest: /etc/nginx/sites-enabled/{{ item.name }}.conf
+    state: link
+    owner: root
+    group: root
+  loop: "{{ nginx_cdn_sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.enabled | default(true)
+  notify:
+    - Test nginx configuration
+    - Reload nginx
+
+- name: Disable nginx sites marked as disabled
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/{{ item.name }}.conf
+    state: absent
+  loop: "{{ nginx_cdn_sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: not item.enabled | default(true)
+  notify:
+    - Test nginx configuration
+    - Reload nginx
+
+- name: Ensure nginx service is enabled and running
+  ansible.builtin.systemd_service:
+    name: nginx
+    enabled: true
+    state: started
+
+- name: Apply HTTP bootstrap nginx configuration
+  ansible.builtin.meta: flush_handlers

@@ -1,0 +1,11 @@
+- name: Install nginx packages
+  ansible.builtin.import_tasks: install.yml
+
+- name: Validate nginx CDN inputs
+  ansible.builtin.import_tasks: validate.yml
+
+- name: Configure nginx HTTP sites
+  ansible.builtin.import_tasks: configure.yml
+
+- name: Configure nginx SSL sites
+  ansible.builtin.import_tasks: ssl.yml

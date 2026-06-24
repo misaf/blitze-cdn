@@ -1,0 +1,31 @@
+- name: Ensure nginx CDN sites are configured
+  ansible.builtin.assert:
+    that:
+      - nginx_cdn_sites | length > 0
+      - nginx_cdn_sites | selectattr('name', 'defined') | list | length == nginx_cdn_sites | length
+      - nginx_cdn_sites | selectattr('origin_host', 'defined') | list | length == nginx_cdn_sites | length
+      - nginx_cdn_sites | selectattr('server_names', 'defined') | list | length == nginx_cdn_sites | length
+    fail_msg: Set nginx_cdn_sites with name, server_names, and origin_host for each CDN domain.
+
+- name: Validate nginx CDN site names and server names
+  ansible.builtin.assert:
+    that:
+      - item.name is match('^[A-Za-z0-9_.-]+$')
+      - item.server_names | length > 0
+    fail_msg: CDN site names may only contain letters, numbers, dot, underscore, and dash; server_names cannot be empty.
+  loop: "{{ nginx_cdn_sites }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed-site') }}"
+
+- name: Ensure letsencrypt email is configured for managed letsencrypt sites
+  ansible.builtin.assert:
+    that:
+      - item.letsencrypt_email | default(nginx_letsencrypt_email) | length > 0
+    fail_msg: Set letsencrypt_email or nginx_letsencrypt_email when managing letsencrypt certificates.
+  loop: "{{ nginx_cdn_sites }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed-site') }}"
+  when:
+    - item.ssl_enabled | default(false)
+    - item.ssl_provider | default(nginx_ssl_provider) == 'letsencrypt'
+    - item.letsencrypt_manage | default(nginx_letsencrypt_manage_certificates)

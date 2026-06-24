@@ -1,0 +1,45 @@
+# - name: Ensure UFW is installed
+#   ansible.builtin.apt:
+#     name: ufw
+#     state: present
+#   tags:
+#     - firewall
+
+# - name: Allow SSH
+#   community.general.ufw:
+#     rule: allow
+#     name: OpenSSH
+#   tags:
+#     - firewall
+
+# - name: Allow incoming access to {{ ansible_facts.default_ipv4.interface }} from 185.134.22.250
+#   community.general.ufw:
+#     rule: allow
+#     interface: {{ ansible_facts.default_ipv4.interface }}
+#     direction: in
+#     src: 185.134.22.250
+#   tags:
+#     - firewall
+
+# - name: Allow incoming access to {{ ansible_facts.default_ipv4.interface }} from 185.134.22.250
+#   community.general.ufw:
+#     rule: allow
+#     interface: {{ ansible_facts.default_ipv4.interface }}
+#     direction: in
+#     src: 104.194.150.26
+#   tags:
+#     - firewall
+
+# - name: Deny all access
+#   community.general.ufw:
+#     rule: deny
+#     interface: {{ ansible_facts.default_ipv4.interface }}
+#     direction: in
+#   tags:
+#     - firewall
+
+# - name: Enable UFW
+#   community.general.ufw:
+#     state: enabled
+#   tags:
+#     - firewall

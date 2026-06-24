@@ -1,0 +1,5 @@
+base_packages:
+  - htop
+
+base_timezone: Asia/Tehran
+base_home_directory: "{{ home_directory | default(ansible_user | default('ubuntu')) }}"

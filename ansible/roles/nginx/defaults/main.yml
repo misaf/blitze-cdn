@@ -1,0 +1,25 @@
+nginx_listen_port: 80
+nginx_origin_scheme: https
+nginx_cache_path: /var/cache/nginx/cdn
+nginx_cache_zone_name: cdn_cache
+nginx_cache_zone_size: 100m
+nginx_cache_max_size: 10g
+nginx_cache_inactive: 60m
+nginx_cache_valid_success: 10m
+nginx_cache_valid_redirect: 10m
+nginx_cache_valid_not_found: 1m
+nginx_proxy_connect_timeout: 5s
+nginx_proxy_read_timeout: 30s
+nginx_proxy_send_timeout: 30s
+nginx_acme_challenge_root: /var/www/letsencrypt
+nginx_letsencrypt_email: ""
+nginx_ssl_redirect: true
+nginx_ssl_protocols: TLSv1.2 TLSv1.3
+nginx_ssl_session_cache: shared:SSL:10m
+nginx_ssl_session_timeout: 1d
+nginx_http2_enabled: true
+nginx_cache_enabled: true
+nginx_ssl_provider: custom
+nginx_ssl_custom_cert_base_path: /etc/nginx/ssl
+nginx_letsencrypt_manage_certificates: false
+nginx_cdn_sites: []

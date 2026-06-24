@@ -1,0 +1,20 @@
+- name: Install nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+  tags:
+    - install packages
+
+- name: Install certbot when managed letsencrypt is enabled
+  ansible.builtin.apt:
+    name: certbot
+    state: present
+  loop: "{{ nginx_cdn_sites }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed-site') }}"
+  when:
+    - item.ssl_enabled | default(false)
+    - item.ssl_provider | default(nginx_ssl_provider) == 'letsencrypt'
+    - item.letsencrypt_manage | default(nginx_letsencrypt_manage_certificates)
+  tags:
+    - install packages

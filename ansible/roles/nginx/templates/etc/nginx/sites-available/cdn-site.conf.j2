@@ -1,0 +1,83 @@
+{% set ssl_enabled = item.ssl_enabled | default(false) and nginx_render_ssl | default(true) %}
+{% set ssl_provider = item.ssl_provider | default(nginx_ssl_provider) %}
+{% set cache_enabled = item.cache_enabled | default(nginx_cache_enabled) %}
+{% set http2_enabled = item.http2_enabled | default(nginx_http2_enabled) %}
+{% set cert_name = item.cert_name | default(item.name) %}
+{% set custom_cert_dir = item.ssl_custom_cert_dir | default(nginx_ssl_custom_cert_base_path ~ '/' ~ item.name) %}
+{% if ssl_provider == 'custom' %}
+{% set ssl_certificate = item.ssl_certificate | default(custom_cert_dir ~ '/fullchain.pem') %}
+{% set ssl_certificate_key = item.ssl_certificate_key | default(custom_cert_dir ~ '/privkey.pem') %}
+{% else %}
+{% set ssl_certificate = '/etc/letsencrypt/live/' ~ cert_name ~ '/fullchain.pem' %}
+{% set ssl_certificate_key = '/etc/letsencrypt/live/' ~ cert_name ~ '/privkey.pem' %}
+{% endif %}
+{% macro proxy_location() %}
+        proxy_pass {{ item.origin_scheme | default(nginx_origin_scheme) }}://{{ item.origin_host }};
+        proxy_http_version 1.1;
+
+        proxy_set_header Host {{ item.origin_request_host | default('$host') }};
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+
+        proxy_ssl_server_name on;
+        proxy_ssl_name {{ item.origin_sni | default(item.origin_request_host | default(item.server_names[0])) }};
+
+        proxy_connect_timeout {{ item.proxy_connect_timeout | default(nginx_proxy_connect_timeout) }};
+        proxy_read_timeout {{ item.proxy_read_timeout | default(nginx_proxy_read_timeout) }};
+        proxy_send_timeout {{ item.proxy_send_timeout | default(nginx_proxy_send_timeout) }};
+
+{% if cache_enabled %}
+        proxy_cache {{ nginx_cache_zone_name }};
+        proxy_cache_key "$scheme$request_method$host$request_uri";
+        proxy_cache_valid 200 301 302 {{ item.cache_valid_success | default(nginx_cache_valid_success) }};
+        proxy_cache_valid 404 {{ item.cache_valid_not_found | default(nginx_cache_valid_not_found) }};
+        proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+        proxy_cache_background_update on;
+        proxy_cache_lock on;
+
+        add_header X-Cache-Status $upstream_cache_status always;
+{% else %}
+        proxy_no_cache 1;
+        proxy_cache_bypass 1;
+{% endif %}
+{% endmacro %}
+server {
+    listen {{ item.listen_port | default(nginx_listen_port) }};
+    listen [::]:{{ item.listen_port | default(nginx_listen_port) }};
+
+    server_name {{ item.server_names | join(' ') }};
+
+    location ^~ /.well-known/acme-challenge/ {
+        root {{ nginx_acme_challenge_root }};
+        default_type "text/plain";
+    }
+
+    location / {
+{% if ssl_enabled and item.ssl_redirect | default(nginx_ssl_redirect) %}
+        return 301 https://$host$request_uri;
+{% else %}
+{{ proxy_location() }}
+{% endif %}
+    }
+}
+{% if ssl_enabled %}
+
+server {
+    listen 443 ssl{% if http2_enabled %} http2{% endif %};
+    listen [::]:443 ssl{% if http2_enabled %} http2{% endif %};
+
+    server_name {{ item.server_names | join(' ') }};
+
+    ssl_certificate {{ ssl_certificate }};
+    ssl_certificate_key {{ ssl_certificate_key }};
+    ssl_protocols {{ nginx_ssl_protocols }};
+    ssl_session_cache {{ nginx_ssl_session_cache }};
+    ssl_session_timeout {{ nginx_ssl_session_timeout }};
+
+    location / {
+{{ proxy_location() }}
+    }
+}
+{% endif %}

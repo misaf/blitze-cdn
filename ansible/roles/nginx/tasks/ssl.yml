@@ -1,0 +1,88 @@
+- name: Ensure custom SSL certificate directories exist
+  ansible.builtin.file:
+    path: "{{ item.ssl_custom_cert_dir | default(nginx_ssl_custom_cert_base_path + '/' + item.name) }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+  loop: "{{ nginx_cdn_sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - item.ssl_enabled | default(false)
+    - item.ssl_provider | default(nginx_ssl_provider) == 'custom'
+    - item.ssl_certificate_src is defined or item.ssl_certificate_key_src is defined
+
+- name: Copy custom SSL certificates
+  ansible.builtin.copy:
+    src: "{{ item.ssl_certificate_src }}"
+    dest: "{{ item.ssl_certificate | default(item.ssl_custom_cert_dir | default(nginx_ssl_custom_cert_base_path + '/' + item.name) + '/fullchain.pem') }}"
+    owner: root
+    group: root
+    mode: '0644'
+  loop: "{{ nginx_cdn_sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - item.ssl_enabled | default(false)
+    - item.ssl_provider | default(nginx_ssl_provider) == 'custom'
+    - item.ssl_certificate_src is defined
+  notify:
+    - Test nginx configuration
+    - Reload nginx
+
+- name: Copy custom SSL private keys
+  ansible.builtin.copy:
+    src: "{{ item.ssl_certificate_key_src }}"
+    dest: "{{ item.ssl_certificate_key | default(item.ssl_custom_cert_dir | default(nginx_ssl_custom_cert_base_path + '/' + item.name) + '/privkey.pem') }}"
+    owner: root
+    group: root
+    mode: '0600'
+  loop: "{{ nginx_cdn_sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - item.ssl_enabled | default(false)
+    - item.ssl_provider | default(nginx_ssl_provider) == 'custom'
+    - item.ssl_certificate_key_src is defined
+  notify:
+    - Test nginx configuration
+    - Reload nginx
+
+- name: Create letsencrypt certificates
+  ansible.builtin.command:
+    cmd: >-
+      certbot certonly --webroot
+      --webroot-path {{ nginx_acme_challenge_root }}
+      --non-interactive
+      --agree-tos
+      --email {{ item.letsencrypt_email | default(nginx_letsencrypt_email) }}
+      --cert-name {{ item.cert_name | default(item.name) }}
+      {{ item.server_names | map('regex_replace', '^(.*)$', '--domain=\1') | join(' ') }}
+    creates: /etc/letsencrypt/live/{{ item.cert_name | default(item.name) }}/fullchain.pem
+  loop: "{{ nginx_cdn_sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - item.ssl_enabled | default(false)
+    - item.ssl_provider | default(nginx_ssl_provider) == 'letsencrypt'
+    - item.letsencrypt_manage | default(nginx_letsencrypt_manage_certificates)
+  notify:
+    - Test nginx configuration
+    - Reload nginx
+
+- name: Copy nginx final site configurations
+  ansible.builtin.template:
+    src: etc/nginx/sites-available/cdn-site.conf.j2
+    dest: /etc/nginx/sites-available/{{ item.name }}.conf
+    owner: root
+    group: root
+    mode: '0644'
+  loop: "{{ nginx_cdn_sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+  vars:
+    nginx_render_ssl: true
+  notify:
+    - Test nginx configuration
+    - Reload nginx

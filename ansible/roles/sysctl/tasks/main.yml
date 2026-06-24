@@ -1,0 +1,10 @@
+- name: Apply sysctl settings
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: true
+  loop: "{{ sysctl_settings | dict2items }}"
+  tags:
+    - sysctl
+    - systemctl

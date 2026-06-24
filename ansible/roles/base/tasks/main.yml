@@ -1,0 +1,23 @@
+- name: Refresh apt package cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  tags:
+    - update packages
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ base_packages }}"
+    state: present
+  tags:
+    - install packages
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ base_timezone }}"
+
+- name: Ensure base home directory exists
+  ansible.builtin.file:
+    path: "/home/{{ base_home_directory }}"
+    state: directory
+    mode: '0755'
